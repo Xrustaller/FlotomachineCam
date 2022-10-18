@@ -9,12 +9,12 @@ from sys import platform
 
 
 def get_root_path():
-    if platform == "linux" or platform == "linux2":
-        full_path = os.getcwd().split("/")
-        return '/'.join(full_path[0:full_path.index("FlotamachineCam") + 1])
-    elif platform == "win32":
+    if platform == "win32":
         full_path = os.getcwd().split("\\")
         return '\\'.join(full_path[0:full_path.index("FlotomachineCam") + 1])
+    else:
+        full_path = os.getcwd().split("/")
+        return '/'.join(full_path[0:full_path.index("FlotomachineCam") + 1])
 
 
 def get_page(name: str) -> bytes:
