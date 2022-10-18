@@ -95,6 +95,7 @@ _ADDRESS = ('', 8000)
 
 
 def main():
+    print("This path:", get_root_path())
     camera = picamera.PiCamera(resolution='640x480', framerate=24)
     output = StreamingOutput()
     # Uncomment the next line to change your Pi's Camera rotation (in degrees)
