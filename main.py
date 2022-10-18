@@ -1,12 +1,5 @@
-import io
 import os
-
-import picamera
-import logging
-import socketserver
-from threading import Condition
-from http import server
-from sys import platform
+from platform import platform
 
 
 def get_root_path():
@@ -21,6 +14,26 @@ def get_root_path():
 def get_page(name: str) -> bytes:
     with open(os.path.join(get_root_path(), name), 'r', encoding='utf-8') as f_temp:  # , 'pages'
         return bytes(f_temp.read().encode('utf-8'))
+
+
+import io
+import picamera
+import logging
+import socketserver
+from threading import Condition
+from http import server
+
+PAGE = """\
+<html>
+<head>
+<title>picamera MJPEG streaming demo</title>
+</head>
+<body>
+<h1>PiCamera MJPEG Streaming Demo</h1>
+<img src="stream.mjpg" width="640" height="480" />
+</body>
+</html>
+"""
 
 
 class StreamingOutput(object):
@@ -48,17 +61,10 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header('Location', '/index.html')
             self.end_headers()
         elif self.path == '/index.html':
-            content = get_page("index.html")
+            content = PAGE.encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', str(len(content)))
-            self.end_headers()
-            self.wfile.write(content)
-        elif self.path == '/foto.':
-            content = get_page("index.html")
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', str(len(content)))
+            self.send_header('Content-Length', len(content))
             self.end_headers()
             self.wfile.write(content)
         elif self.path == '/stream.mjpg':
@@ -70,18 +76,19 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
             try:
                 while True:
-                    pass
-                    with output_stream.condition:
-                        output_stream.condition.wait()
-                        frame = output_stream.frame
+                    with output.condition:
+                        output.condition.wait()
+                        frame = output.frame
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
-                    self.send_header('Content-Length', str(len(frame)))
+                    self.send_header('Content-Length', len(frame))
                     self.end_headers()
                     self.wfile.write(frame)
                     self.wfile.write(b'\r\n')
             except Exception as e:
-                logging.warning('Removed streaming client %s: %s', self.client_address, str(e))
+                logging.warning(
+                    'Removed streaming client %s: %s',
+                    self.client_address, str(e))
         else:
             self.send_error(404)
             self.end_headers()
@@ -92,22 +99,12 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     daemon_threads = True
 
 
-_ADDRESS = ('', 8000)
-output_stream = StreamingOutput()
-
-
-def main():
-    print("This path:", get_root_path())
-    camera = picamera.PiCamera(resolution='640x480', framerate=24)
-    # Uncomment the next line to change your Pi's Camera rotation (in degrees)
-    # camera.rotation = 90
-    camera.start_recording(output_stream, format='mjpeg')
+with picamera.PiCamera(resolution='640x480', framerate=24) as camera:
+    output = StreamingOutput()
+    camera.start_recording(output, format='mjpeg')
     try:
-        StrServer = StreamingServer(_ADDRESS, StreamingHandler)
-        StrServer.serve_forever()
+        address = ('', 8000)
+        server = StreamingServer(address, StreamingHandler)
+        server.serve_forever()
     finally:
         camera.stop_recording()
-
-
-if __name__ == "__main__":
-    main()
