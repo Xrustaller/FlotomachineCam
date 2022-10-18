@@ -1,5 +1,6 @@
 import io
 import os
+
 import picamera
 import logging
 import socketserver
@@ -70,9 +71,9 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             try:
                 while True:
                     pass
-                    with output.condition:
-                        output.condition.wait()
-                        frame = output.frame
+                    with output_stream.condition:
+                        output_stream.condition.wait()
+                        frame = output_stream.frame
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', str(len(frame)))
@@ -92,15 +93,16 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 
 
 _ADDRESS = ('', 8000)
+output_stream = None
 
 
 def main():
     print("This path:", get_root_path())
     camera = picamera.PiCamera(resolution='640x480', framerate=24)
-    output = StreamingOutput()
+    output_stream = StreamingOutput()
     # Uncomment the next line to change your Pi's Camera rotation (in degrees)
     # camera.rotation = 90
-    camera.start_recording(output, format='mjpeg')
+    camera.start_recording(output_stream, format='mjpeg')
     try:
         StrServer = StreamingServer(_ADDRESS, StreamingHandler)
         StrServer.serve_forever()
