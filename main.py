@@ -1,12 +1,40 @@
 import io
+import json
 import os
 
-import picamera
+# import picamera
 import logging
 import socketserver
 from threading import Condition
 from http import server
 from sys import platform
+import cgi
+
+settings_file_name = "settings.json"
+
+default_settings = {
+    # "restart": False,
+    "port": 8000,
+    "camera": {
+        "rotation": 90,
+        "resolution": "640x480",
+        "framerate": 24
+    }
+
+}
+
+
+def load_settings() -> dict:
+    f_temp = open(settings_file_name, 'r', encoding='utf-8')
+    result = json.loads(f_temp.read())
+    f_temp.close()
+    return result
+
+
+def save_settings(input_json: dict) -> None:
+    f_res = open(settings_file_name, 'w', encoding='utf-8')
+    f_res.write(json.dumps(input_json))
+    f_res.close()
 
 
 def get_root_path():
@@ -96,14 +124,41 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/settings':
-            with output_stream.condition:
-                output_stream.condition.wait()
-                frame = output_stream.frame
+            if self.headers.get_content_type() != 'application/json':
+                self.send_error(400)
+                self.end_headers()
+                return
+
+            # read the message and convert it into a python dictionary
+            cl_val, cl_key = self.headers.get_params(header='content-length')[0]
+            length = int(cl_val)
+            message = json.loads(self.rfile.read(length))
+            need_save = False
+            #print("POST Settings", message)
+            if "port" in message.keys() and message["port"]:
+                settings["port"] = message["port"]
+                need_save = True
+            if "camera" in message.keys() and message["camera"]:
+                if "rotation" in message.keys() and message["rotation"]:
+                    settings["camera"]["rotation"] = message["camera"]["rotation"]
+                    need_save = True
+                if "resolution" in message.keys() and message["resolution"]:
+                    settings["camera"]["resolution"] = message["camera"]["resolution"]
+                    need_save = True
+                if "framerate" in message.keys() and message["framerate"]:
+                    settings["camera"]["framerate"] = message["camera"]["framerate"]
+                    need_save = True
+
+            if need_save:
+                save_settings(settings)
+                print("Settings saved", settings)
+            response = {"CODE": "OK", "DATA": load_settings()}
             self.send_response(200)
-            self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Content-Length', str(len(frame)))
+            self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            self.wfile.write(frame)
+            self.wfile.write(json.dumps(response).encode(encoding='utf_8'))
+            if "restart" in message.keys() and message["restart"]:
+                StrServer.shutdown()
         else:
             self.send_error(404)
             self.end_headers()
@@ -114,21 +169,24 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     daemon_threads = True
 
 
-_ADDRESS = ('', 8000)
 output_stream = StreamingOutput()
+
+settings = load_settings()
+StrServer = StreamingServer(("", settings["port"]), StreamingHandler)
 
 
 def main():
-    print("This path:", get_root_path())
-    camera = picamera.PiCamera(resolution='640x480', framerate=24)
-    # Uncomment the next line to change your Pi's Camera rotation (in degrees)
-    # camera.rotation = 90
-    camera.start_recording(output_stream, format='mjpeg')
-    try:
-        StrServer = StreamingServer(_ADDRESS, StreamingHandler)
-        StrServer.serve_forever()
-    finally:
-        camera.stop_recording()
+    print("Server start\nThis path:", get_root_path())
+    while True:
+        try:
+            camera = picamera.PiCamera(resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"])
+            # Uncomment the next line to change your Pi's Camera rotation (in degrees)
+            camera.rotation = settings["camera"]["rotation"]
+            camera.start_recording(output_stream, format='mjpeg')
+            StrServer.serve_forever()
+        finally:
+            camera.stop_recording()
+        print("Server restart")
 
 
 if __name__ == "__main__":
