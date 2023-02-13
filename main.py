@@ -196,7 +196,7 @@ def main():
             # Uncomment the next line to change your Pi's Camera rotation (in degrees)
             camera.configure(camera.create_video_configuration(main={"size": (settings["camera"]["resolution"]["x"], settings["camera"]["resolution"]["y"])}))
             camera.rotation = settings["camera"]["rotation"]
-            camera.start_recording(JpegEncoder(), output_stream)
+            camera.start_recording(JpegEncoder(), FileOutput(output_stream))
             StrServer.serve_forever()
         finally:
             camera.stop_recording()
