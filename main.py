@@ -2,7 +2,7 @@ import io
 import json
 import os
 
-# import picamera
+import picamera
 import logging
 import socketserver
 from threading import Condition
@@ -102,11 +102,11 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                         output_stream.condition.wait()
                         frame = output_stream.frame
                     self.wfile.write(b'--FRAME\r\n')
-                    self.send_header('Content-Type', 'image/jpeg')
+                    #self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', str(len(frame)))
                     self.end_headers()
                     self.wfile.write(frame)
-                    self.wfile.write(b'\r\n')
+                    #self.wfile.write(b'\r\n')
             except Exception as e:
                 logging.warning('Removed streaming client %s: %s', self.client_address, str(e))
         elif self.path == '/photo':
@@ -186,6 +186,7 @@ def main():
             StrServer.serve_forever()
         finally:
             camera.stop_recording()
+            pass
         print("Server restart")
 
 
