@@ -2,7 +2,7 @@ import io
 import json
 import os
 
-import picamera
+from picamera2 import Picamera2
 import logging
 import socketserver
 from threading import Condition
@@ -179,7 +179,7 @@ def main():
     print("Server start\nThis path:", get_root_path())
     while True:
         try:
-            camera = picamera.PiCamera(resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"])
+            camera = Picamera2(resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"])
             # Uncomment the next line to change your Pi's Camera rotation (in degrees)
             camera.rotation = settings["camera"]["rotation"]
             camera.start_recording(output_stream, format='mjpeg')
