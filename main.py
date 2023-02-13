@@ -2,12 +2,14 @@ import io
 import json
 import os
 
-from picamera2 import Picamera2
 import logging
 import socketserver
 from threading import Condition
 from http import server
 from sys import platform
+from picamera2 import Picamera2
+from picamera2.encoders import JpegEncoder
+from picamera2.outputs import FileOutput
 import cgi
 
 settings_file_name = "settings.json"
@@ -102,11 +104,11 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                         output_stream.condition.wait()
                         frame = output_stream.frame
                     self.wfile.write(b'--FRAME\r\n')
-                    #self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', str(len(frame)))
                     self.end_headers()
                     self.wfile.write(frame)
-                    #self.wfile.write(b'\r\n')
+                    self.wfile.write(b'\r\n')
             except Exception as e:
                 logging.warning('Removed streaming client %s: %s', self.client_address, str(e))
         elif self.path == '/photo':
@@ -118,6 +120,13 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(frame)))
             self.end_headers()
             self.wfile.write(frame)
+        elif self.path == "/get_info":
+            content = {"sensor_resolution": picam2.sensor_resolution}
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
         else:
             self.send_error(404)
             self.end_headers()
@@ -142,8 +151,11 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                 if "rotation" in message.keys() and message["rotation"]:
                     settings["camera"]["rotation"] = message["camera"]["rotation"]
                     need_save = True
-                if "resolution" in message.keys() and message["resolution"]:
-                    settings["camera"]["resolution"] = message["camera"]["resolution"]
+                if "resolution" in message.keys() and message["resolution"] and \
+                        "x" in message["resolution"].keys() and "y" in message["resolution"].keys() and \
+                        isinstance(message["resolution"]["x"], int) and isinstance(message["resolution"]["y"], int):
+                    settings["camera"]["resolution"]["x"] = message["camera"]["resolution"]["x"]
+                    settings["camera"]["resolution"]["y"] = message["camera"]["resolution"]["y"]
                     need_save = True
                 if "framerate" in message.keys() and message["framerate"]:
                     settings["camera"]["framerate"] = message["camera"]["framerate"]
@@ -178,11 +190,13 @@ StrServer = StreamingServer(("", settings["port"]), StreamingHandler)
 def main():
     print("Server start\nThis path:", get_root_path())
     while True:
+        camera: None
         try:
-            camera = Picamera2(resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"])
+            camera = Picamera2() # resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"]
             # Uncomment the next line to change your Pi's Camera rotation (in degrees)
+            camera.configure(camera.create_video_configuration(main={"size": (settings["camera"]["resolution"]["x"], settings["camera"]["resolution"]["y"])}))
             camera.rotation = settings["camera"]["rotation"]
-            camera.start_recording(output_stream, format='mjpeg')
+            camera.start_recording(JpegEncoder(), output_stream)
             StrServer.serve_forever()
         finally:
             camera.stop_recording()
