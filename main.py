@@ -1,12 +1,11 @@
-import io
 import json
 import os
-
+import io
 import logging
 import socketserver
-from threading import Condition
 from http import server
-from sys import platform
+from threading import Condition
+
 from picamera2 import Picamera2
 from picamera2.encoders import JpegEncoder
 from picamera2.outputs import FileOutput
@@ -181,10 +180,10 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     daemon_threads = True
 
 
-output_stream = StreamingOutput()
-
 settings = load_settings()
 stream_server = StreamingServer(("", settings["port"]), StreamingHandler)
+
+output_stream = StreamingOutput()
 
 camera2 = Picamera2()  # resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"]
 # Uncomment the next line to change your Pi's Camera rotation (in degrees)
