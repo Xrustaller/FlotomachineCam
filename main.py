@@ -143,7 +143,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             length = int(cl_val)
             message = json.loads(self.rfile.read(length))
             need_save = False
-            #print("POST Settings", message)
+            # print("POST Settings", message)
             if "port" in message.keys() and message["port"]:
                 settings["port"] = message["port"]
                 need_save = True
@@ -170,7 +170,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(response).encode(encoding='utf_8'))
             if "restart" in message.keys() and message["restart"]:
-                StrServer.shutdown()
+                stream_server.shutdown()
         else:
             self.send_error(404)
             self.end_headers()
@@ -184,22 +184,22 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 output_stream = StreamingOutput()
 
 settings = load_settings()
-StrServer = StreamingServer(("", settings["port"]), StreamingHandler)
+stream_server = StreamingServer(("", settings["port"]), StreamingHandler)
+
+camera2 = Picamera2()  # resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"]
+# Uncomment the next line to change your Pi's Camera rotation (in degrees)
+camera2.configure(camera2.create_video_configuration(main={"size": (settings["camera"]["resolution"]["x"], settings["camera"]["resolution"]["y"])}))
+camera2.rotation = settings["camera"]["rotation"]
+camera2.start_recording(JpegEncoder(), FileOutput(output_stream))
 
 
 def main():
     print("Server start\nThis path:", get_root_path())
     while True:
-        camera: None
         try:
-            camera = Picamera2() # resolution=settings["camera"]["resolution"], framerate=settings["camera"]["framerate"]
-            # Uncomment the next line to change your Pi's Camera rotation (in degrees)
-            camera.configure(camera.create_video_configuration(main={"size": (settings["camera"]["resolution"]["x"], settings["camera"]["resolution"]["y"])}))
-            camera.rotation = settings["camera"]["rotation"]
-            camera.start_recording(JpegEncoder(), FileOutput(output_stream))
-            StrServer.serve_forever()
+            stream_server.serve_forever()
         finally:
-            camera.stop_recording()
+            camera2.stop_recording()
             pass
         print("Server restart")
 
